@@ -20,7 +20,7 @@ from plugin_manager import PluginManager
 # Models can be found here: https://platform.openai.com/docs/models/overview
 GPT_3_MODELS = ("gpt-3.5-turbo", "gpt-3.5-turbo-0301", "gpt-3.5-turbo-0613")
 GPT_3_16K_MODELS = ("gpt-3.5-turbo-16k", "gpt-3.5-turbo-16k-0613")
-GPT_4_MODELS = ("gpt-4", "gpt-4-0314", "gpt-4-0613")
+GPT_4_MODELS = ("gpt-4", "gpt-4-0314", "gpt-4-0613", "gpt-4-1106-preview")
 GPT_4_32K_MODELS = ("gpt-4-32k", "gpt-4-32k-0314", "gpt-4-32k-0613")
 GPT_ALL_MODELS = GPT_3_MODELS + GPT_3_16K_MODELS + GPT_4_MODELS + GPT_4_32K_MODELS
 
@@ -95,8 +95,14 @@ class OpenAIHelper:
         openai.proxy = config['proxy']
         self.config = config
         self.plugin_manager = plugin_manager
-        self.conversations: dict[int: list] = {}  # {chat_id: history}
+        self.conversations: dict[int: dict] = {}  # {chat_id: {config: {key: value}, messages_list: list} }
         self.last_updated: dict[int: datetime] = {}  # {chat_id: last_update_timestamp}
+
+    def from_local_config(self, chat_id, name):
+        if chat_id in self.conversations.keys() and name in self.conversations[chat_id]['config'].keys():
+            return self.conversations[chat_id]['config'][name]
+        else:
+            return self.config[name]
 
     def get_conversation_stats(self, chat_id: int) -> tuple[int, int]:
         """
@@ -106,7 +112,7 @@ class OpenAIHelper:
         """
         if chat_id not in self.conversations:
             self.reset_chat_history(chat_id)
-        return len(self.conversations[chat_id]), self.__count_tokens(self.conversations[chat_id])
+        return len(self.conversations[chat_id]['messages_list']), self.__count_tokens(self.conversations[chat_id]['messages_list'])
 
     async def get_chat_response(self, chat_id: int, query: str) -> tuple[str, str]:
         """
@@ -176,7 +182,7 @@ class OpenAIHelper:
                 yield answer, 'not_finished'
         answer = answer.strip()
         self.__add_to_history(chat_id, role="assistant", content=answer)
-        tokens_used = str(self.__count_tokens(self.conversations[chat_id]))
+        tokens_used = str(self.__count_tokens(self.conversations[chat_id]['messages_list']))
 
         show_plugins_used = len(plugins_used) > 0 and self.config['show_plugins_used']
         plugin_names = tuple(self.plugin_manager.get_plugin_source_name(plugin) for plugin in plugins_used)
@@ -212,28 +218,29 @@ class OpenAIHelper:
             self.__add_to_history(chat_id, role="user", content=query)
 
             # Summarize the chat history if it's too long to avoid excessive token usage
-            token_count = self.__count_tokens(self.conversations[chat_id])
+            token_count = self.__count_tokens(self.conversations[chat_id]['messages_list'])
             exceeded_max_tokens = token_count + self.config['max_tokens'] > self.__max_model_tokens()
-            exceeded_max_history_size = len(self.conversations[chat_id]) > self.config['max_history_size']
+            exceeded_max_history_size = len(self.conversations[chat_id]['messages_list']) > self.config['max_history_size']
 
             if exceeded_max_tokens or exceeded_max_history_size:
                 logging.info(f'Chat history for chat ID {chat_id} is too long. Summarising...')
                 try:
-                    summary = await self.__summarise(self.conversations[chat_id][:-1])
-                    logging.debug(f'Summary: {summary}')
-                    self.reset_chat_history(chat_id, self.conversations[chat_id][0]['content'])
-                    self.__add_to_history(chat_id, role="assistant", content=summary)
-                    self.__add_to_history(chat_id, role="user", content=query)
+                    raise Exception('Summarise is not allowed')
+                    # summary = await self.__summarise(self.conversations[chat_id]['messages_list'][:-1])
+                    # logging.debug(f'Summary: {summary}')
+                    # self.reset_chat_history(chat_id, self.conversations[chat_id]['messages_list'][0]['content'])
+                    # self.__add_to_history(chat_id, role="assistant", content=summary)
+                    # self.__add_to_history(chat_id, role="user", content=query)
                 except Exception as e:
                     logging.warning(f'Error while summarising chat history: {str(e)}. Popping elements instead...')
-                    self.conversations[chat_id] = self.conversations[chat_id][-self.config['max_history_size']:]
+                    self.conversations[chat_id]['messages_list'] = self.conversations[chat_id]['messages_list'][-self.config['max_history_size']:]
 
             common_args = {
-                'model': self.config['model'],
-                'messages': self.conversations[chat_id],
-                'temperature': self.config['temperature'],
+                'model': self.from_local_config(chat_id, 'model'),
+                'messages': self.conversations[chat_id]['messages_list'],
+                'temperature': self.from_local_config(chat_id, 'temperature'),
                 'n': self.config['n_choices'],
-                'max_tokens': self.config['max_tokens'],
+                'max_tokens': self.from_local_config(chat_id, 'max_tokens'),
                 'presence_penalty': self.config['presence_penalty'],
                 'frequency_penalty': self.config['frequency_penalty'],
                 'stream': stream
@@ -303,7 +310,7 @@ class OpenAIHelper:
         self.__add_function_call_to_history(chat_id=chat_id, function_name=function_name, content=function_response)
         response = await openai.ChatCompletion.acreate(
             model=self.config['model'],
-            messages=self.conversations[chat_id],
+            messages=self.conversations[chat_id]['messages_list'],
             functions=self.plugin_manager.get_functions_specs(),
             function_call='auto' if times < self.config['functions_max_consecutive_calls'] else 'none',
             stream=stream
@@ -348,13 +355,53 @@ class OpenAIHelper:
             logging.exception(e)
             raise Exception(f"⚠️ _{localized_text('error', self.config['bot_language'])}._ ⚠️\n{str(e)}") from e
 
-    def reset_chat_history(self, chat_id, content=''):
+    def reset_chat_history(self, chat_id, param_str=''):
         """
         Resets the conversation history.
         """
+        
+        CONFIG_KEYS = {
+            "model": {
+                "propper_key": "model",
+                "handler": str
+            },
+            "temp": {
+                "propper_key": "temperature",
+                "handler": float
+            },
+            "max": {
+                "propper_key": "max_tokens",
+                "handler": int
+            }
+        }
+
+        custom_config = {}
+
+        params = param_str.split(' ')
+
+        content_list = []
+
+        for param_elem in params:
+            if not param_elem or '=' not in param_elem or len(param_elem.split('=')) != 2:
+                content_list.append(param_elem)
+                continue
+            key, value = param_elem.split('=')
+            if key not in CONFIG_KEYS.keys():
+                continue
+
+            custom_config[CONFIG_KEYS[key]["propper_key"]] = CONFIG_KEYS[key]["handler"](value)
+
+        content = ' '.join(content_list)
+
+        logging.info(custom_config)
+        logging.info(content)
+
         if content == '':
             content = self.config['assistant_prompt']
-        self.conversations[chat_id] = [{"role": "system", "content": content}]
+        self.conversations[chat_id] = {
+            "messages_list": [{"role": "system", "content": content}],
+            "config": custom_config
+        }
 
     def __max_age_reached(self, chat_id) -> bool:
         """
@@ -373,7 +420,7 @@ class OpenAIHelper:
         """
         Adds a function call to the conversation history
         """
-        self.conversations[chat_id].append({"role": "function", "name": function_name, "content": content})
+        self.conversations[chat_id]['messages_list'].append({"role": "function", "name": function_name, "content": content})
 
     def __add_to_history(self, chat_id, role, content):
         """
@@ -382,7 +429,7 @@ class OpenAIHelper:
         :param role: The role of the message sender
         :param content: The message content
         """
-        self.conversations[chat_id].append({"role": role, "content": content})
+        self.conversations[chat_id]['messages_list'].append({"role": role, "content": content})
 
     async def __summarise(self, conversation) -> str:
         """

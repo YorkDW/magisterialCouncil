@@ -200,7 +200,7 @@ class ChatGPTTelegramBot:
 
         chat_id = update.effective_chat.id
         reset_content = message_text(update.message)
-        self.openai.reset_chat_history(chat_id=chat_id, content=reset_content)
+        self.openai.reset_chat_history(chat_id, reset_content)
         await update.effective_message.reply_text(
             message_thread_id=get_thread_id(update),
             text=localized_text('reset_done', self.config['bot_language'])
