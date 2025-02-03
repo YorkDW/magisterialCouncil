@@ -562,15 +562,6 @@ class OpenAIHelper:
 
         yield answer, tokens_used
 
-    def reset_chat_history(self, chat_id, content=''):
-        """
-        Resets the conversation history.
-        """
-        if content == '':
-            content = self.config['assistant_prompt']
-        self.conversations[chat_id]['messages_list'] = [{"role": "assistant" if self.conversations[chat_id]['config']['model'] in O_MODELS else "system", "content": content}]
-        self.conversations_vision[chat_id] = False
-
     def reset_chat_history(self, chat_id, param_str=''):
         """
         Resets the conversation history.
