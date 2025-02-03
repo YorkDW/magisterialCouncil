@@ -182,7 +182,7 @@ class ChatGPTTelegramBot:
         #     )
 
         usage_text = text_current_conversation + text_today + text_month + text_budget
-        await update.message.reply_text(usage_text, parse_mode=constants.ParseMode.MARKDOWN)
+        await update.message.reply_text(usage_text, parse_mode=constants.ParseMode.MARKDOWN_V2)
 
     async def resend(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -280,7 +280,7 @@ class ChatGPTTelegramBot:
                     message_thread_id=get_thread_id(update),
                     reply_to_message_id=get_reply_to_message_id(self.config, update),
                     text=f"{localized_text('image_fail', self.config['bot_language'])}: {str(e)}",
-                    parse_mode=constants.ParseMode.MARKDOWN
+                    parse_mode=constants.ParseMode.MARKDOWN_V2
                 )
 
         await wrap_with_indicator(update, context, _generate, constants.ChatAction.UPLOAD_PHOTO)
@@ -326,7 +326,7 @@ class ChatGPTTelegramBot:
                     message_thread_id=get_thread_id(update),
                     reply_to_message_id=get_reply_to_message_id(self.config, update),
                     text=f"{localized_text('tts_fail', self.config['bot_language'])}: {str(e)}",
-                    parse_mode=constants.ParseMode.MARKDOWN
+                    parse_mode=constants.ParseMode.MARKDOWN_V2
                 )
 
         await wrap_with_indicator(update, context, _generate, constants.ChatAction.UPLOAD_VOICE)
@@ -360,7 +360,7 @@ class ChatGPTTelegramBot:
                         f"{localized_text('media_download_fail', bot_language)[0]}: "
                         f"{str(e)}. {localized_text('media_download_fail', bot_language)[1]}"
                     ),
-                    parse_mode=constants.ParseMode.MARKDOWN
+                    parse_mode=constants.ParseMode.MARKDOWN_V2
                 )
                 return
 
@@ -410,7 +410,7 @@ class ChatGPTTelegramBot:
                             message_thread_id=get_thread_id(update),
                             reply_to_message_id=get_reply_to_message_id(self.config, update) if index == 0 else None,
                             text=transcript_chunk,
-                            parse_mode=constants.ParseMode.MARKDOWN
+                            parse_mode=constants.ParseMode.MARKDOWN_V2
                         )
                 else:
                     # Get the response of the transcript
@@ -432,7 +432,7 @@ class ChatGPTTelegramBot:
                             message_thread_id=get_thread_id(update),
                             reply_to_message_id=get_reply_to_message_id(self.config, update) if index == 0 else None,
                             text=transcript_chunk,
-                            parse_mode=constants.ParseMode.MARKDOWN
+                            parse_mode=constants.ParseMode.MARKDOWN_V2
                         )
 
             except Exception as e:
@@ -441,7 +441,7 @@ class ChatGPTTelegramBot:
                     message_thread_id=get_thread_id(update),
                     reply_to_message_id=get_reply_to_message_id(self.config, update),
                     text=f"{localized_text('transcribe_fail', bot_language)}: {str(e)}",
-                    parse_mode=constants.ParseMode.MARKDOWN
+                    parse_mode=constants.ParseMode.MARKDOWN_V2
                 )
             finally:
                 if os.path.exists(filename_mp3):
@@ -489,7 +489,7 @@ class ChatGPTTelegramBot:
                         f"{localized_text('media_download_fail', bot_language)[0]}: "
                         f"{str(e)}. {localized_text('media_download_fail', bot_language)[1]}"
                     ),
-                    parse_mode=constants.ParseMode.MARKDOWN
+                    parse_mode=constants.ParseMode.MARKDOWN_V2
                 )
                 return
             
@@ -609,7 +609,7 @@ class ChatGPTTelegramBot:
                             message_thread_id=get_thread_id(update),
                             reply_to_message_id=get_reply_to_message_id(self.config, update),
                             text=interpretation,
-                            parse_mode=constants.ParseMode.MARKDOWN
+                            parse_mode=constants.ParseMode.MARKDOWN_V2
                         )
                     except BadRequest:
                         try:
@@ -624,7 +624,7 @@ class ChatGPTTelegramBot:
                                 message_thread_id=get_thread_id(update),
                                 reply_to_message_id=get_reply_to_message_id(self.config, update),
                                 text=f"{localized_text('vision_fail', bot_language)}: {str(e)}",
-                                parse_mode=constants.ParseMode.MARKDOWN
+                                parse_mode=constants.ParseMode.MARKDOWN_V2
                             )
                 except Exception as e:
                     logging.exception(e)
@@ -632,7 +632,7 @@ class ChatGPTTelegramBot:
                         message_thread_id=get_thread_id(update),
                         reply_to_message_id=get_reply_to_message_id(self.config, update),
                         text=f"{localized_text('vision_fail', bot_language)}: {str(e)}",
-                        parse_mode=constants.ParseMode.MARKDOWN
+                        parse_mode=constants.ParseMode.MARKDOWN_V2
                     )
             vision_token_price = self.config['vision_token_price']
             self.usage[user_id].add_vision_tokens(total_tokens, vision_token_price)
@@ -782,7 +782,7 @@ class ChatGPTTelegramBot:
                                 reply_to_message_id=get_reply_to_message_id(self.config,
                                                                             update) if index == 0 else None,
                                 text=chunk,
-                                parse_mode=constants.ParseMode.MARKDOWN
+                                parse_mode=constants.ParseMode.MARKDOWN_V2
                             )
                         except Exception:
                             try:
@@ -805,7 +805,7 @@ class ChatGPTTelegramBot:
                 message_thread_id=get_thread_id(update),
                 reply_to_message_id=get_reply_to_message_id(self.config, update),
                 text=f"{localized_text('chat_fail', self.config['bot_language'])} {str(e)}",
-                parse_mode=constants.ParseMode.MARKDOWN
+                parse_mode=constants.ParseMode.MARKDOWN_V2
             )
 
     async def inline_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -951,7 +951,7 @@ class ChatGPTTelegramBot:
                         # Edit the current message to indicate that the answer is being processed
                         await context.bot.edit_message_text(inline_message_id=inline_message_id,
                                                             text=f'{query}\n\n_{answer_tr}:_\n{loading_tr}',
-                                                            parse_mode=constants.ParseMode.MARKDOWN)
+                                                            parse_mode=constants.ParseMode.MARKDOWN_V2)
 
                         logging.info(f'Generating response for inline query by {name}')
                         response, total_tokens = await self.openai.get_chat_response(chat_id=user_id, query=query)
