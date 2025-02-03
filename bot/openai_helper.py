@@ -562,7 +562,7 @@ class OpenAIHelper:
 
         yield answer, tokens_used
 
-    def reset_chat_history(self, chat_id, param_str=''):
+    def reset_chat_history(self, chat_id, content=''):
         """
         Resets the conversation history.
         """
@@ -580,7 +580,7 @@ class OpenAIHelper:
 
         custom_config = {}
 
-        params = param_str.split(' ')
+        params = content.split(' ')
 
         content_list = []
 
