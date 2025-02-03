@@ -595,14 +595,18 @@ class OpenAIHelper:
             custom_config[CONFIG_KEYS[key]['propper_key']] = CONFIG_KEYS[key]['handler'](value)
 
         content = ' '.join(content_list)
-
-        logging.info(custom_config)
-        logging.info(content)
-
+        
         if content == '':
             content = self.config['assistant_prompt']
+
+        if 'model' not in custom_config:
+            custom_config['model'] = self.config['model']
+
+        if 'temperature' not in custom_config:
+            custom_config['temperature'] = self.config['temperature']
+
         self.conversations[chat_id] = {
-            "messages_list": [{"role": "assistant" if self.conversations[chat_id]['config']['model'] in O_MODELS else "system", "content": content}],
+            "messages_list": [{"role": "assistant" if custom_config['model'] in O_MODELS else "system", "content": content}],
             "config": custom_config
         }
         self.conversations_vision[chat_id] = False
